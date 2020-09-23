@@ -1,0 +1,164 @@
+#include <avr/sleep.h>
+#include <avr/power.h>
+#include <Servo.h>
+#include "max6675.h"
+
+#define INT_PIN 2
+#define RoteLED 13
+
+float Temperatur;
+ int GrueneLED = 12;
+ int BlaueLED = 11;
+ int Power = 8;
+ int plus= 6;
+int masse= 7;
+int thermoDO = 3;
+int thermoCS = 4;
+int thermoCLK = 5;
+Servo myservo;
+
+int pos = 0; 
+
+void INT_PINisr(void)
+  /* ISR fuer Pin 2 */
+  {
+  /* detach Interrupt, damit er nur einmal auftritt */
+  detachInterrupt(0);
+  }
+  
+void enter_sleep(void)
+  {
+  attachInterrupt(0, INT_PINisr, LOW);
+  /* Arduino schlafen legen */
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
+  sleep_mode();
+  sleep_disable(); 
+  }
+  
+MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
+
+
+
+void setup()
+  {
+  myservo.attach(9);
+  Serial.begin(9600);
+  Serial.println("Starte ...");
+  /* Pin 2 als Interrupt-Pin, Pullup einschalten */
+  pinMode(INT_PIN, INPUT); 
+  pinMode(RoteLED, OUTPUT);
+  pinMode(Power, OUTPUT);
+  pinMode(RoteLED, OUTPUT);
+  pinMode(BlaueLED, OUTPUT);
+  pinMode(GrueneLED, OUTPUT);
+  pinMode(plus, OUTPUT); digitalWrite(plus, HIGH);
+  pinMode(masse, OUTPUT); digitalWrite(masse, LOW);
+  Serial.println("Init erfolgt ...");
+  
+  }
+
+
+
+
+
+
+
+void loop()
+  {
+
+
+  Serial.println("boot...");
+
+   /*Funktionsprüfung*/
+   for (pos = 180; pos > 0; pos -= 1) // goes from 0 degrees to 180 degrees in steps of 1 degree
+  {
+    myservo.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(10);                       // waits 15ms for the servo to reach the position
+  }
+  
+  for (pos = 0; pos < 180; pos += 1) // goes from 180 degrees to 0 degrees
+  {
+    myservo.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(10);                       // waits 15ms for the servo to reach the position
+  }
+
+    
+  /* warten, bis der Interrupt-Eingang wieder frei ist */
+  while (digitalRead(INT_PIN)== HIGH)
+{
+  Serial.println("Spannung liegt an");  
+    
+ 
+/*Temperatur auslesen*/
+   Serial.print("C = "); 
+   Serial.println(thermocouple.readCelsius());
+   Serial.print("F = ");
+   Serial.println(thermocouple.readFahrenheit());
+   
+
+/*Optische Überwachung*/
+   if(thermocouple.readCelsius() >28)
+   {
+   digitalWrite(RoteLED, HIGH);
+   digitalWrite(GrueneLED, LOW);
+   }
+
+   if(thermocouple.readCelsius() <= 28)
+   {
+   digitalWrite(RoteLED, LOW);
+   digitalWrite(GrueneLED, HIGH); 
+   }
+
+
+/*Temperaturgesteuerte Klappen*/
+ if(thermocouple.readCelsius() >=34 )
+ {
+  for (pos; pos < 0; pos += 1)  // goes from 0 degrees to 100 degrees in steps of 1 degree
+     {  
+      myservo.write(pos);              // tell servo to go to position in variable 'pos'
+      delay(10);                      // waits 15ms for the servo to reach the position
+     }
+     
+  for (pos; pos > 0; pos -= 1)  // goes from 0 degrees to 100 degrees in steps of 1 degree
+     {  
+      myservo.write(pos);              // tell servo to go to position in variable 'pos'
+      delay(10);                      // waits 15ms for the servo to reach the position
+     }
+ }
+
+
+   if(thermocouple.readCelsius() <=33)
+ {
+  for (pos; pos < 100; pos += 1)  // goes from 0 degrees to 100 degrees in steps of 1 degree
+     {  
+      myservo.write(pos);              // tell servo to go to position in variable 'pos'
+      delay(10);                      // waits 15ms for the servo to reach the position
+     }
+     
+  for (pos; pos > 100; pos -= 1)  // goes from 0 degrees to 100 degrees in steps of 1 degree
+     {  
+      myservo.write(pos);              // tell servo to go to position in variable 'pos'
+      delay(10);                      // waits 15ms for the servo to reach the position
+     }
+ }
+
+
+  Serial.println(pos);
+ 
+  delay(2000); 
+}
+  /*Vorgang nachdem die Spannung abgefallen ist*/
+  Serial.println("Gehe schlafen ...");  
+  
+  for (pos; pos <= 180; pos += 1) // goes from 100 degrees to 0 degrees in steps of 1 degree
+  {
+    myservo.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(10);                       // waits 15ms for the servo to reach the position
+  }
+
+  delay(2000);
+  enter_sleep();
+  Serial.println("Bin aufgewacht ...");  
+  delay(100);
+  }
